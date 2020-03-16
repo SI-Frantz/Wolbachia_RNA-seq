@@ -1,0 +1,432 @@
+---
+title: "updates to RNA-seq project"
+author: "Sophia Frantz"
+date: "9/24/2019"
+output: html_document
+---
+
+# Batch Effect: Permanova and GO term analysis on the separate batches 
+
+files and packages:
+```{r}
+#Differential expression files: 
+batch1_Geno_noOutlier = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/resultsGenoWithinBatch1_noOutlier", header = TRUE)
+batch2_Geno = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/BatchAndOutliers/resultsGenoWithinBatch2", header=TRUE )
+resultsRemoveOutlier = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/BatchAndOutliers/resultsTrtControlGeno_RemoveOutlier", header = TRUE, row.names=1) 
+
+#counts files for permanova: 
+countDat_batch1 = read.csv(file ="/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/countDat_batch1", header = TRUE, row.names = 1 )
+countDat_batch2 = read.csv(file ="/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/countDat_batch2", header = TRUE, row.names = 1 )
+#metadata 
+metadata_batch1 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/batch1", header=TRUE, row.names = 1) 
+metadata_batch2 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/batch2", header=TRUE, row.names = 1)  
+  
+#genes list for Venn Diagrams 
+batch1_genes = batch1_Geno_noOutlier[which(batch1_Geno_noOutlier$padj < 0.05),]
+nrow(batch1_genes)
+batch1_genes_down = batch1_genes[which(batch1_genes$log2FoldChange < 0),]
+batch1_genes_up = batch1_genes[which(batch1_genes$log2FoldChange > 0),]
+batch2_genes = batch2_Geno[which(batch2_Geno$padj < 0.05),]
+batch2_genes_down = batch2_genes[which(batch2_genes$log2FoldChange < 0),]
+batch2_genes_up = batch2_genes[which(batch2_genes$log2FoldChange > 0),]
+together_genes = resultsRemoveOutlier[which(resultsRemoveOutlier$padj < 0.05),]
+together_genes_down = together_genes[which(together_genes$log2FoldChange < 0),]
+together_genes_up = together_genes[which(together_genes$log2FoldChange > 0),] 
+```
+
+```{r}
+#install.packages("vegan")  #the adonis() function will do the permutation analysis
+library(vegan)
+library(tibble)
+library(dplyr)
+library(ggplot2)
+```
+
+# Tables ! 
+- tables of up and down- regulated genes for each batch. Tables of GO terms. (need to do KEGG terms too.)
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+# add a column to depict whether a gene is UP or DOWN-regulated, in case I want to color the boxes: 
+newColumn = rep(NA, nrow(batch1_genes))
+for (x in 1:nrow(batch1_genes)) {
+  y = ifelse(batch1_genes$log2FoldChange[x] < 0, "-", "+" )
+  newColumn[x] = y 
+}
+batch1_genes$Direction = newColumn
+
+# convert log2fold change to Fold Change:
+newColumn = rep(NA, nrow(batch1_genes))
+for (x in 1:nrow(batch1_genes)) {
+  y = 
+  newColumn[x] = y 
+}
+
+test = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/testBatch1_1")
+
+test = sort(test$submitted_id)
+
+write.csv(test, file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/testBatch1_1")
+
+batch1_genes$FoldChange = 2^batch1_genes$log2FoldChange
+write.csv(batch1_genes, file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/batch1_df_DE")
+
+batch1_final = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/batch1_df_DE1", header = FALSE)
+join = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/batch1_geneSymbols")
+batch1_final$geneDescription = join$current_symbol 
+batch1_final$V3 = as.numeric(as.character(batch1_final$V3))
+batch1_final$V11 = as.numeric(as.character(batch1_final$V11))
+batch1_final$V8 = as.numeric(as.character(batch1_final$V8))
+#Modify this: 
+kable(batch1_final[,c(2,12,3,10,11,8)], digits = 3, col.names = c("FlyBase ID","gene Symbol", "base mean", "direction", "fold change", "adj p-value")) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"))  %>%
+  
+ # row_spec(which(df$cyl >6), bold = T, color = "white", background = "red")
+  save_kable("kable_DEgeneTable.pdf")
+
+# do the same for batch 1 
+# fix "direction" later , sort by highest fold change ?? 
+
+# already have GO term tables (for most nested) - in Figs for paper 
+```
+
+
+
+perMANOVA test on both batches:  
+Batch 1: 
+```{r message=FALSE}
+otu.env = metadata_batch1
+dim(countDat_batch1)
+countDat_batch1 = t(countDat_batch1)  #transposes a matrix 
+dis1 = vegdist(countDat_batch1) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity. 
+```
+
+```{r}
+adonis(dis1 ~ treatment*genotype, data = otu.env, perm=999)  
+# permutations set at 999; this can change. 
+# strata ensures randomizations will occur within each genotype, not across genotypes.
+```
+
+Notes: 
+
+batch 2: 
+```{r message=FALSE, echo=FALSE}
+otu.env = metadata_batch2
+dim(countDat_batch2)
+countDat_batch2 = t(countDat_batch2)  #transposes a matrix 
+dis2 = vegdist(countDat_batch2) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity. 
+```
+
+```{r}
+adonis(dis2 ~ treatment*genotype, data = otu.env, perm=999)  
+# permutations set at 999; this can change. 
+# strata ensures randomizations will occur within each genotype, not across genotypes.
+```
+
+
+Notes: Hmm I don't like this... In Batch 1, the treatment and genotyoe contribute to the percent dissimilarity almost equally, and treatment x genotype also contributes more to the total dissimilarity. Overall, more of the dissimilarity is explained by the factors and less absorbed by the residuals for the samples in Batch 1. When you look at the ordination plots, RAL73 and RAL783 samples overlap each other a lot, much more than RAL306 and RAL853. In Batch2, genotype accounts for a higher percentage of the dissimilarity, but it isn't *that* much more (19% for Batch1, 17% for Batch2). But the percent due to infection status (treatment) *is* much lower (19% for Batch1, 6% for Batch2). I wonder how do these results on separate batches contribute to the effect of analyzing all samples together? Is the result from all samples due to like an average of the 2 batches? Or is it because the 4 genotypes are so different from each other, and the genotypes are confounded with batch, potentially making the genotypes seem even more different? 
+
+Results: Genotype has a significant effect in explaining the dissimilarity in gene expression among samples for both Batch 1 and Batch 2. (R2 Batch 1 = 0.17, p = 0.006; R2 Batch 2 = 0.26, p = 0.014). Treatment (infection status) explains the dissimilarity among samples for Batch 1 but not for Batch 2 (R2 Batch 1 = 0.19, p = 0.002; R2 Batch 2 = 0.05 p = 0.325).
+
+The samples in Batch 2 look more dissimilar from each other than the samples within Batch 1. This extensive dissimilarity (excessive noise?) and strong effect of genotype could be the reason treatment explains less of the dissimlarity among samples. ...? 
+Alternatively, the trend could reflect true differences in Wolbachia's effect on transcription in different genotypes. 
+
+Comparison of Genes identified in Batch 1 vs. Batch 2:
+```{r message= FALSE, echo=FALSE}
+library(VennDiagram)
+vennD = venn.diagram(x = list(batch1_genes, batch2_genes), category.names = c("batch 1", "batch 2"), filename = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batches_design2_comparison.png")
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batches_design2_comparison.png" )
+plot(myimg, axes = FALSE)
+```
+
+## Comparison of GO Terms:  
+-GO terms in Batch 1 look similar to the overall effect (the test including all samples.)  
+-There are only 96 significant genes for Batch2; it is unlikely there are enough genes to comprise overrepresentation of GO terms, and so it is unlikely the GO terms will be significant. Accordingly, there were no significant GO terms after FDR correction. I still wanted to see how these genes would group, even if their numbers were not significantly overrepresented. Therefore I ran the test without FDR correction. There are __ GO terms with uncorrected p-value below 0.05.   
+-I want to separate up- and down-regulated too.   
+- Batch 1: 
+600 upregulated   
+400 downregulated   
+
+Batch 2: 
+37 upregulated (showing GO terms with significant p-value but these are not significant after the FDR correction)
+61 genes downregulated (showing GO terms with significant p-value but these are not significant after the FDR correction)
+
+-All 4 Tables of the most nested GO-terms are in /Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/
+
+## Mahalanobis test for effects of the outlier 
+-normality assumption should be checked before testing for outliers (?). Have I done this? Is rna-seq data usually normal? 
+-Masking effects of outliers: An outlier is revealed only once an even more extreme outlier is removed. 
+-Mahalanobis distande can be influenced by the masking effect.
+-Influence measure: "In general use, those observations that have a cook’s distance greater than 4 times the mean may be classified as influential. This is not a hard boundary."
+-"As noted by several authors [4–6], if data have a multivariate normal distribution, then, each of the
+variables has a univariate normal distribution; but the opposite does not have to be true. Hence,
+checking univariate plots and tests could be very useful to diagnose the reason for deviation from
+MVN."
+```{r}
+library(MVN)
+#data should be a dataframe or matrix, and rows should be samples, columns should be variables (genes)
+#data should be the count matrix, with all 32 samples.
+countDat=t(countDat)
+mvn(data=countDat, subset = NULL, mvnTest = c("mardia"), covariance = TRUE, tol = 1e-25, alpha = 0.5,scale = FALSE, desc = TRUE, transform = "none", R = 1000,univariateTest = c("SW"),univariatePlot = "qq", multivariatePlot = "none", multivariateOutlierMethod = "quan", bc = FALSE, bcType = "rounded",showOutliers = TRUE, showNewData = FALSE)
+
+# univariateTest = c("SW", "CVM", "Lillie", "SF", "AD")
+# mvn test options: mvnTest = c("mardia", "hz", "royston", "dh","energy")
+#check the results from all available tests: c("mardia", "hz", "royston", "dh", "energy"). Some may not be appropriate for this dataset. 
+```
+
+Subset:
+
+```{r}
+#library(MVN)
+#countDat=as.data.frame(countDat)
+countDat= read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+countDat=t(countDat)
+subsetCountDat = countDat[,1:2000]
+subsetCountDat = as.matrix(subsetCountDat)
+result <- mvn(data = subsetCountDat, mvnTest = "hz", covariance = TRUE)
+result$multivariateNormality
+```
+
+This was taking a long time... maybe try it on the cluster or something.
+
+## Cook's distance to detect outliers.
+
+```{r}
+countDat=as.data.frame(countDat)
+subsetCountDat = countDat[,1:2000]
+mod <- lm(data=subsetCountDat)
+cooksd <- cooks.distance(mod)
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+```
+
+Just do this to find the outlier, once Talapas is up and running again: 
+
+https://www.cs.colostate.edu/~asa/courses/rnaseq/fall17/lib/exe/fetch.php?media=deseq2_vignette.pdf
+
+
+## Transcription of Genes Across the Genome
+
+-examining RNA-seq alignments https://www.bioconductor.org/help/course-materials/2015/BioC2015/bioc2015rnaseq.html
+
+- Use this!? Karyoplot: https://bernatgel.github.io/karyoploter_tutorial//Examples/GeneExpression/GeneExpression.html
+
+Are the differentially expressed genes distributed randomly across the genome? Or non-randomly? Perhaps they are preferentially located on the e/ro region. This region and the y/v region are both on the X-chromosome. In a previous study (Singh 2019), recombination increased in wolbachia-infected flies in the e/ro region but not in the y/v region. So, I am testing the hypothesis that the higher recombination indicates more open chromatin at this region, and that the open chromatin facilitates more transcription.
+Hypothesis:  open chromatin is associated with high rates of recombination. 
+
+Distribution of upregulated genes in batch 1:
+```{r}
+# library(chromPlot)
+# use batch1_genes_up 
+data("dm_gap")
+```
+
+For resultsRemoveOutlier (both batches):
+
+karyoplot instructions:  
+-Once we have the differential expression results we’ll need to map the genes to the genome and to do that we’ll use the Drosophila TranscriptDb package
+-We’ll start by using the genes function to create a GRanges object with all genes.
+
+```{r}
+ # library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+txdb <- TxDb.Dmelanogaster.UCSC.dm6.ensGene
+dm.genes <- genes(txdb)
+dm.genes
+# add my data of differential expression information to this genes table. 
+mcols(dm.genes) <- resultsRemoveOutlier[names(dm.genes), c("log2FoldChange", "stat", "pvalue", "padj")] #make sure results is a dataframe with 6 columns, gene names should be row names, not a column.
+head(dm.genes, n=4)
+# we specify to karyoploteR which genome we are working with (drosophila, 6th annotation):
+library(karyoploteR)
+kp <- plotKaryotype(genome="dm6")
+# Label the 10 most differentially expressed genes on the karyotype
+ordered <- dm.genes[order(dm.genes$padj, na.last = TRUE),]
+kp <- plotKaryotype(genome="dm6")
+kp <- kpPlotMarkers(kp, ordered[1:10], labels = names(ordered[1:10]), text.orientation = "horizontal")
+# create a plot with the p-values of all significant genes. First, transform the adjusted p-value into something easy to represent and visualize, such as a minus logarithm transformation, a common trick. Also filter out the genes with NA in the padj column:
+filtered.dm.genes <- dm.genes[!is.na(dm.genes$padj)]
+log.pval <- -log10(filtered.dm.genes$padj)
+mcols(filtered.dm.genes)$log.pval <- log.pval
+filtered.dm.genes #there are 9,226 genes in this dataframe now.
+#plot the significant genes' log adjusted p-value at their position in the genome on the karyotype:
+sign.genes <- filtered.dm.genes[filtered.dm.genes$padj < 0.05,]
+kp <- plotKaryotype(genome="dm6")
+kpPoints(kp, data=sign.genes, y=sign.genes$log.pval, ymax=max(sign.genes$log.pval)) #set the ymax 
+range(sign.genes$log.pval) # see the range of y-values so we know what to plot on the y-axis (1.3 - 8.0)
+```
+
+```{r}
+# we specify to karyoploteR which genome we are working with (drosophila, 6th annotation):
+library(karyoploteR)
+kp <- plotKaryotype(genome="dm6")
+# Label the 10 most differentially expressed genes on the karyotype
+ordered <- dm.genes[order(dm.genes$padj, na.last = TRUE),]
+kp <- plotKaryotype(genome="dm6")
+kp <- kpPlotMarkers(kp, ordered[1:10], labels = names(ordered[1:10]), text.orientation = "horizontal")
+# create a plot with the p-values of all significant genes. First, transform the adjusted p-value into something easy to represent and visualize, such as a minus logarithm transformation, a common trick. Also filter out the genes with NA in the padj column:
+filtered.dm.genes <- dm.genes[!is.na(dm.genes$padj)]
+log.pval <- -log10(filtered.dm.genes$padj)
+mcols(filtered.dm.genes)$log.pval <- log.pval
+filtered.dm.genes #there are 9,226 genes in this dataframe now.
+#plot the significant genes' log adjusted p-value at their position in the genome on the karyotype:
+sign.genes <- filtered.dm.genes[filtered.dm.genes$padj < 0.05,]
+kp <- plotKaryotype(genome="dm6")
+kpPoints(kp, data=sign.genes, y=sign.genes$log.pval, ymax=max(sign.genes$log.pval)) #set the ymax 
+range(sign.genes$log.pval) # see the range of y-values so we know what to plot on the y-axis (1.3 - 8.0)
+```
+
+Plot the log2foldchange instead:
+```{r}
+range(sign.genes$log2FoldChange)
+fc.ymax <- ceiling(max(abs(range(sign.genes$log2FoldChange))))
+fc.ymin <- -fc.ymax
+fc.ymax =2
+fc.ymin=-2
+kp <- plotKaryotype(genome="dm6")
+kpPoints(kp, data=sign.genes, y=sign.genes$log2FoldChange, ymax=fc.ymax, ymin=fc.ymin)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin)
+kpAddLabels(kp, labels = "log2 FC", cex=0.5, srt=90, pos=1, label.margin = 0.09)
+```
+
+```{r}
+#make the dot represent the adjusted p-value significance - bigger = more significant
+points.top <- 0.8
+cex.val <- sqrt(sign.genes$log.pval)/2
+kp <- plotKaryotype(genome="dm6", cex=0.5)
+kpPoints(kp, data=sign.genes, y=sign.genes$log2FoldChange, cex=cex.val, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin, cex=0.5, r1=points.top)
+kpAddLabels(kp, labels = "log2 FC", cex=0.5, srt=90, pos=1, label.margin = 0.06, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+top.genes <- ordered[1:20]
+kpPlotMarkers(kp, top.genes, labels = names(top.genes), text.orientation = "horizontal", cex = 0.5, r0=points.top) # change this to label only the meiosis genes
+```
+
+```{r}
+#make the dot represent the adjusted p-value significance - bigger = more significant
+points.top <- 0.8
+cex.val <- sqrt(sign.genes$log.pval)/2
+kp <- plotKaryotype(genome="dm6", plot.type=2, cex = 0.85)
+#Data panel 1
+kpPoints(kp, data=sign.genes, y=sign.genes$log2FoldChange, cex = cex.val, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, col=sign.col)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, cex = 0.5)
+kpAddLabels(kp, labels = "log2 FC", cex = 0.5, srt=90, pos=1, label.margin = 0.04, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+gene.mean <- start(top.genes) + (end(top.genes) - start(top.genes))/2
+kpSegments(kp, chr=as.character(seqnames(top.genes)), x0=gene.mean, x1=gene.mean, y0=top.genes$log2FoldChange, y1=fc.ymax, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+#kpPlotMarkers(kp, top.genes, labels = names(top.genes), text.orientation = "horizontal", r0=points.top)
+
+#Data panel 2
+kp <- kpPlotDensity(kp, data=dm.genes, window.size = 10e4, data.panel = 2)
+```
+
+```{r}
+kp <- plotKaryotype(genome="dm6", plot.type=2)
+#Data panel 1
+kpHeatmap(kp, data=sign.genes, y=sign.genes$log2FoldChange, colors = c("green", "red"), cex = cex.val)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, cex = 0.5)
+kpAddLabels(kp, labels = "log2 FC", srt=90, pos=1, label.margin = 0.04, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, cex = 0.5)
+#gene.mean <- start(top.genes) + (end(top.genes) - start(top.genes))/2
+#kpSegments(kp, chr=as.character(seqnames(top.genes)), x0=gene.mean, x1=gene.mean, y0=top.genes$log2FoldChange, y1=fc.ymax, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+#kpPlotMarkers(kp, top.genes, labels = names(top.genes), text.orientation = "horizontal", r0=points.top)
+
+#Data panel 2
+kp <- kpPlotDensity(kp, data=dm.genes, window.size = 10e4, data.panel = 2)
+```
+
+
+**These points look silly...try kpBars() or kpHeatmap()  or kpRect()- if the bars don't go both up and down. **
+https://bioconductor.org/packages/release/bioc/vignettes/karyoploteR/inst/doc/karyoploteR.html#types-of-plots
+
+in batch 2:
+
+overall (analyzed together):
+
+
+-how big is the region of e/ro ? 
+-
+
+## How to display the GO terms associated with my results. Interpret results: what functional processes are the differentially expressed genes involved in?
+## Histogram of p-values for genes in category "Meiosis I Cell Cycle Process"
+
+Add ranks to the dataframe based on ascending p-value: 
+```{r}
+#order:
+batch1_Geno_noOutlier = batch1_Geno_noOutlier[order(batch1_Geno_noOutlier$pvalue, na.last = TRUE),]
+#add a column of ranks: 
+batch1_Geno_noOutlier$rank <- 1:nrow(batch1_Geno_noOutlier) 
+```
+
+***Maybe what needs to happen is this: take the top GO terms associated with recombination, meiosis, etc, and use the genes from there. 
+-Use a low GO term as the null distribution. Find something to do for the null. 
+
+For batch 1: 
+```{r}
+meiGenes = c("FBgn0000063","FBgn0010097","FBgn0021761","FBgn0000146","FBgn0083095","FBgn0000308","FBgn0041603","FBgn0003525","FBgn0002909","FBgn0264291","FBgn0004367","FBgn0003482","FBgn0002948","FBgn0043905","FBgn0001301","FBgn0284220","FBgn0260986","FBgn0034646","FBgn0030268","FBgn0264270","FBgn0260015","FBgn0020270","FBgn0004698","FBgn0086251","FBgn0011569","FBgn0283442","FBgn0045035","FBgn0027889","FBgn0266672","FBgn0261954","FBgn0028434","FBgn0004875","FBgn0003479","FBgn0260932","FBgn0002673","FBgn0051053","FBgn0039017","FBgn0027868","FBgn0010431","FBgn0011202","FBgn0002709","FBgn0017577","FBgn0002906","FBgn0033921","FBgn0028581","FBgn0004379","FBgn0002781","FBgn0034435","FBgn0011206","FBgn0011207","FBgn0001133","FBgn0261266","FBgn0032705","FBgn0010314","FBgn0067771","FBgn0004373","FBgn0004372","FBgn0002525","FBgn0267975","FBgn0267967","FBgn0000246","FBgn0038612","FBgn0267378","FBgn0266668","FBgn0003227","FBgn0031759","FBgn0002710","FBgn0036486","FBgn0051453","FBgn0086350","FBgn0014342","FBgn0028525","FBgn0003475","FBgn0029977","FBgn0260399","FBgn0011208","FBgn0040347","FBgn0083091","FBgn0003483","FBgn0026401","FBgn0283545","FBgn0260013","FBgn0034098","FBgn0020616","FBgn0261787","FBgn0083062","FBgn0003480","FBgn0039858","FBgn0002899","FBgn0264307","FBgn0034118","FBgn0002842","FBgn0011606","FBgn0031018","FBgn0260942","FBgn0019686","FBgn0001086","FBgn0016036","FBgn0002901","FBgn0000351","FBgn0036389","FBgn0038767","FBgn0083094","FBgn0262733","FBgn0266124","FBgn0003502","FBgn0003041","FBgn0002989","FBgn0002707","FBgn0033549","FBgn0286813","FBgn0026417","FBgn0027537","FBgn0025918","FBgn0039044","FBgn0002716","FBgn0024689","FBgn0050169","FBgn0031977","FBgn0025919","FBgn0260012")
+
+meiosis1 = c("FBgn0000063","FBgn0010097","FBgn0002909","FBgn0004367","FBgn0003482","FBgn0002948","FBgn0284220","FBgn0260986","FBgn0034646","FBgn0030268","FBgn0264270","FBgn0004698","FBgn0011569","FBgn0027889","FBgn0261954","FBgn0028434","FBgn0003479","FBgn0051053","FBgn0039017","FBgn0010431","FBgn0002709","FBgn0017577","FBgn0002906","FBgn0028581","FBgn0004379","FBgn0002781","FBgn0034435","FBgn0001133","FBgn0011207","FBgn0032705","FBgn0010314","FBgn0004372","FBgn0267967","FBgn0000246","FBgn0038612","FBgn0003227","FBgn0002710","FBgn0051453","FBgn0014342","FBgn0028525","FBgn0086350","FBgn0029977","FBgn0260399","FBgn0040347","FBgn0026401","FBgn0283545","FBgn0020616","FBgn0003480","FBgn0002842","FBgn0264307","FBgn0011606","FBgn0031018","FBgn0016036","FBgn0001086","FBgn0002901","FBgn0000351","FBgn0036389","FBgn0038767","FBgn0002707","FBgn0002989","FBgn0033549","FBgn0025918","FBgn0002716","FBgn0039044","FBgn0025919","FBgn0050169")
+
+homologous_recomb = c("FBgn0002710","FBgn0051453","FBgn0028525","FBgn0002909","FBgn0004367","FBgn0003482","FBgn0029977","FBgn0040347","FBgn0284220","FBgn0260986","FBgn0264270","FBgn0004698","FBgn0028434","FBgn0003479","FBgn0003480","FBgn0039017","FBgn0011606","FBgn0002709","FBgn0002906","FBgn0017577","FBgn0016036","FBgn0028581","FBgn0002901","FBgn0038767","FBgn0038889","FBgn0267967","FBgn0002989","FBgn0002707","FBgn0000246","FBgn0033549","FBgn0025918","FBgn0002716","FBgn0039044","FBgn0003227","FBgn0025919","FBgn0050169")
+```
+
+```{r}
+#order:
+batch1_Geno_noOutlier = batch1_Geno_noOutlier[order(batch1_Geno_noOutlier$pvalue, na.last = TRUE),]
+#add a column of ranks: 
+batch1_Geno_noOutlier$rank <- 1:nrow(batch1_Geno_noOutlier) 
+batch1_Geno_mei1GO = subset(batch1_Geno_noOutlier, batch1_Geno_noOutlier[[1]] %in% meiosis1)
+library(ggplot2)
+ggplot(as(batch1_Geno_mei1GO, "data.frame"), aes(x = rank)) +
+  geom_histogram(binwidth = 500, fill = "cyan3", boundary = 0) + ggtitle("Meiosis I Genes") + theme(plot.title = element_text(hjust = 0.5)) + labs(x = "gene rank based on p-value", y = "frequency")
+```
+
+For batch 2:
+```{r}
+batch1_Geno_mei1GO = subset(batch2_Geno, batch2_Geno[[1]] %in% meiosis1)
+#library(ggplot2)
+ggplot(as(batch1_Geno_mei1GO, "data.frame"), aes(x = pvalue)) +
+  geom_histogram(binwidth = 0.01, fill = "cyan3", boundary = 0)
+```
+
+Overall: 
+
+```{r}
+all_Geno_mei1GO = subset(resultsRemoveOutlier, resultsRemoveOutlier[[1]] %in% meiosis1)
+#library(ggplot2)
+ggplot(as(all_Geno_mei1GO, "data.frame"), aes(x = pvalue)) +
+  geom_histogram(binwidth = 0.01, fill = "cyan3", boundary = 0)
+```
+
+
+Questions:
+-Use p-value or adjusted p-value?
+-Which category to use? I think "meiosis 1" 
+
+to do:
+-fix bins, (how to bin?)
+label axes as 0-0.05, .05-0.1, etc. 
+
+# Calculate tissue-specific gene enrichment:
+-whole fly expression vs. ovary expression bar graph 
+-I do not understand this: 
+"A widely used method which does not depend on such a cut-off in its formula is Tau [14] (for details, see ‘Materials and Methods’). Tau varies from 0 to 1, where 0 means broadly expressed, and 1 is specific (used in e.g. [15–24])."
+  https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5444245/ 
+  See section in "Material and Methods" 
+
+
+```{r}
+geneExpression = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/FinalResults_andFigures_ForPaper/upRegGenes_GeneExpression.csv", header=TRUE)
+geneExpression = na.omit(geneExpression)
+library(dplyr)
+library(tibble)
+geneExpression = rownames_to_column(geneExpression)
+```
+
+```{r}
+library(ggplot2)
+geneExpression$rowname <- as.character(as.numeric(geneExpression$rowname))
+g <- ggplot(geneExpression, aes(rowname, ovaryMean))
+g + geom_point()
+
+```
+

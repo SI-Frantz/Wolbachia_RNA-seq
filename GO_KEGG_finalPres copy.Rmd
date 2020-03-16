@@ -1,0 +1,266 @@
+---
+title: "GO terms and KEGG Pathway Tables"
+author: "Sophia Frantz"
+date: "9/18/2019"
+output: html_document
+---
+
+# Identifying relevant genes and patterns of genes: 
+-Plan:  
+  - GO terms - outlier-removed and outlier-included data  
+  - KEGG pathways   
+  - support with previous literature   
+  
+## GO Analysis
+-I use 2 different criteria to determine genes with significant differential expression:   
+> - Genes with a fold change > 0 and adjusted p-value < 0.05   
+> - Genes with a fold change >= |2| and non-corrected p-value < 0.05 (He et al BMC paper uses this)  
+
+## What type of GO analysis to do?
+- The second reason I had trouble because I did not know which program to use, or which test within a program to use to find the differentially expressed genes. I tried different programs/tests and will present the results from each one. It was hard to interpret the results because there were SO MANY significant GO terms, or the GO terms were so vague that I did not know what they meant (ie what does "Macromolecule biosynthetic process" mean? Vague.) It was also difficult because GO terms are nested, and the same genes for the GO term "kinetochore assembly" are nested within "protein-containing complex subunit organization". Both are significant GO terms, but "kinetochore assembly" is more informative than the broader, vaguer one. Then I found a way to display the nestedness of the GO terms, and I think this helped me understand the data better. The lower-level GO term (more specific) is displayed at the top, and the GO terms that lead to this term are displayed under it.
+
+## GO analysis 1:
+- Genes with a fold change > 0 and adjusted p-value < 0.05
+- Separate Upregulated and Downregulated lowest level GO terms
+- Of the significant genes , there are 639 upregulated genes and 419 downregulated genes. 
+
+```{r echo = FALSE}
+resultsRemoveOutlier = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/BatchAndOutliers/resultsTrtControlGeno_RemoveOutlier", header = TRUE) 
+genes_noOutlier = resultsRemoveOutlier[which(resultsRemoveOutlier$padj < 0.05),]
+upreg = genes_noOutlier[which(genes_noOutlier$log2FoldChange > 0),]
+downreg = genes_noOutlier[which(genes_noOutlier$log2FoldChange < 0),]
+upregGenes = upreg$X
+downregGenes = downreg$X
+write.csv(upregGenes, file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/upregGenes")
+write.csv(downregGenes, file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/downregGenes")
+```
+
+## GO terms downregulated 
+
+```{r}
+nestedGO_downreg = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/downRegGO", sep = "\t", header = TRUE) 
+nestedGO_downreg[1:8,]
+```
+
+## GO terms for down-regulated genes
+- There are only a few GO terms associated with the down-regulated genes. Almost all of them related to translation:
+  - ribosome assembly, 
+  - cytoplasmic translation, 
+  - translational initiation,  
+  - maturation of LSU-rRNA from tricistronic rRNA transcript (SSU-rRNA, 5.8S rRNA, LSU-rRNA)
+  - tRNA modification 
+  - Also: extracellular matrix organization, methylation 
+
+## GO terms for down-regulated genes continued 
+- These results are consistent with Christenson et al 2016, which found downregulation of protein synthesis:
+- "Notably, the variant Dmel wMelCS and Dsim wMel combinations in this study exhibited depletion of dozens of ribosomal constituents, consistent with overall downregulation (68–70)." 
+- This paper also talks about previous evidence of increased germ line stem cell division, which could account for the increased genes involved in mitosis and cell division. "The downregula- tion of the cell division suppressor 14-3-3 zeta is also consistent with enhanced germ line stem cell division rates observed for Wolbachia-infected organisms (11, 78)."
+
+## GO terms upregulated (top 20 terms)
+
+```{r}
+nestedGO_upreg = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/upRegGO", sep = "\t", header = TRUE) 
+nestedGO_upreg[1:20,]
+```
+
+## GO terms for up-regulated genes
+- The story is a little more complicated for the up-regulated genes. There are more significant upregulated genes, so that helps to complicate the matter. Here are some notable terms:
+  - kinetochore assembly (all 4 in the genome)
+  - negative regulation of compound eye cone cell fate specification (What? Random.)
+  - meiotic spindle midzone assembly (all 3 in the genome)
+  - microtubule sliding (all 3)
+  - spindle assembly involved in female meiosis (GO:0007056)	 (meiosis!)
+  
+  - To explain the mitosis genes and the GO term "eggshell chorion gene amplification (GO:0007307)": Is there higher reproductive output in wolbachia-infected flies? 
+
+# Comparison with meiosis & recombination literature 
+
+- These are the differentially expressed genes with support from existing literature for roles in meiosis (McKim et al 2002 - reviww of drosophila meiosis genes, and Hunter et al 2016 GWAS of natural variation in recombination).
+
+```{r echo = FALSE}
+genes1= resultsRemoveOutlier[which(resultsRemoveOutlier$padj <= 0.05),]
+forGO=genes1$X
+forGO=write.csv(genes1$X, file = "/Users/sophia/Desktop/forGO")
+lit_genes2 = subset(resultsRemoveOutlier, resultsRemoveOutlier[[1]] %in% c("FBgn0002924","FBgn0003009","FBgn0003545","FBgn0261278", "FBgn0267487", "FBgn0283521")) 
+IDsg2 = read.csv(file="/Users/sophia/Desktop/p05", header=TRUE, sep = "\t")
+row.names(lit_genes2) = IDsg2[1:6,2]
+lit_genes2$source = read.csv(file="/Users/sophia/Desktop/sources2", header=FALSE)
+lit_genes2[1:6,2:9]
+#write.csv(lit_genes2, file = "/Users/sophia/Desktop/litGenes2")
+```
+
+# More Previous Literature 
+
+## Presgraves et al 2018 - meiosis genes
+- I also compared my data to the list of recombination and meiosis genes that Presgraves et al 2016 use in their study of the molecular evolution of meiosis genes. 
+- 35 genes in Presgraves paper, 8 in common. 
+## ---- 
+```{r echo = FALSE}
+genes1= resultsRemoveOutlier[which(resultsRemoveOutlier$padj <= 0.05),]
+forGO=genes1$X
+forGO=write.csv(genes1$X, file = "/Users/sophia/Desktop/forGO")
+presgravdeGenes = subset(resultsRemoveOutlier, resultsRemoveOutlier[[1]] %in% c("FBgn0000140","FBgn0002899","FBgn0002906","FBgn0003009","FBgn0003545","FBgn0011606","FBgn0017577","FBgn0040283")) 
+IDsg3 = read.csv(file="/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Presgraves.txt", header=TRUE, sep = "\t")
+row.names(presgravdeGenes) = IDsg3[1:8,3]
+presgravdeGenes[1:8,]
+````
+
+## ord 
+- "orientation disruptor (ord) encodes a chromosome-localized protein required for meiotic sister chromatid cohesion in both sexes. In oocytes, it also promotes normal formation and maintenance of the synaptonemal complex and centromere clustering." (FlyBase)  
+- rapidly evolving gene   
+- "Mutations at ord cause precocious separation of sister chromatids, at earlier stages than do mutations at mei-S332."
+
+## Christenson et al 2016 - wolbachia-infected drosophila ovarian proteome 
+
+-Christenson et al. also find downregulation of ribosome and translation proteins!  
+
+-  "Notably, the variant Dmel wMelCS and Dsim wMel combinations in this study exhibited depletion of dozens of ribosomal constituents, consistent with overall downregulation (68–70)."   
+
+- This paper also talks about previous evidence of increased germ line stem cell division, which could account for the increased genes involved in mitosis and cell division. "The downregula- tion of the cell division suppressor 14-3-3 zeta is also consistent with enhanced germ line stem cell division rates observed for Wolbachia-infected organisms (11, 78)."
+
+
+## He et al 2019 - drosophila ovarian response to wolbachia RNA-seq paper 
+
+- **Background/Purpose**: This He et al. study is the only other dataset we know of documenting gene expression in the drosophila ovary (comparing wolbachia-infected to -uninfected). We can use this dataset to check for the consistency across samples. If there are many differences, this could indicate that either their or our data is from flies experiencing effects other than the main effect of wolbachia infection status. It could also indicate the breadth of variation in the drosophila ovarian response to wolbachia. If there is consistency between the datasets, this consistency bolsters both groups' findings.
+
+- Comparison of the number of genes identified (using their criteria of pvalue < 0.05 and fold change >= 2:)
+```{r echo = FALSE}
+sumStatsHe = read.csv("/Users/sophia/Documents/sum_stats_He.csv", header = TRUE, row.names = 1)
+sumStatsHe
+```
+
+## GO terms associated with the genes that meet the He et al. criteria
+
+- There are no significant GO terms
+
+- But here is the table generated by the GO analysis, which shows of the groups the genes fall into: 
+```{r}
+GOterms_He = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/GOterms_HeCriteria.csv", header = TRUE)
+GOterms_He[]
+```
+
+##  GO terms associated with the genes that meet the He et al. criteria continued  
+- Female gamete generation is here   
+- these terms seem so random...I cannot discern a pattern/ what they have in common/ how they work together to explain what is going on with wolbachia-infected ovaries.   
+- again, no sig enrichment so am not sure what to conclude here.     
+- He et al also find no significant enrichment, so they just report which categories their genes fall into. (Figure 1b)
+
+## He et al comparison continued 
+
+- Venn Diagram for comparison of genes identified in the 2 studies:
+
+```{r message=FALSE, echo=FALSE}
+Treatment_Control_Geno = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/Treatment_Control_Geno.csv", header = TRUE, row.names=1) 
+BMCparameters = Treatment_Control_Geno[which(Treatment_Control_Geno$pvalue < 0.05),]
+write.csv(BMCparameters[ which(BMCparameters$log2FoldChange >= 1.0 ), ], file = "/Users/sophia/Desktop/BMCincGO")
+write.csv(BMCparameters[ which(BMCparameters$log2FoldChange <= -1.0 ), ], file = "/Users/sophia/Desktop/BMCdecGO")
+my.genes = read.csv("/Users/sophia/Desktop/BMC")
+genesBMC = read.csv("/Users/sophia/Desktop/BMC2")
+```
+
+```{r message=FALSE, echo=FALSE, out.width= "200px"}
+library(VennDiagram)
+vennD = venn.diagram(x = list(my.genes$gene, genesBMC$gene), category.names = c("My Data", "He et al."), filename = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/BMC_mydata_geneIdentityComparison")
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/BMC_mydata_geneIdentityComparison.png" )
+plot(myimg, axes = FALSE)
+```
+
+## genes in common with He et al 
+
+- Only 8 genes in common: 
+
+```{r}
+incommon = calculate.overlap(x = list(my.genes$gene, genesBMC$gene))
+incommon$a3
+```
+
+## ---- 
+- 4 of these genes have a name/function: 
+  > - 	temperature-induced paralytic E  
+  > - 	SKP1-related C  
+  > - Ribosomal protein L22-like (encodes a eukaryotic-specific component of the large ribosomal subunit involved in protein synthesis)  
+  > - Ionotropic receptor 31a   
+
+- The only other similarity is that they find "starch and sucrose metabolism" genes are enriched KEGG pathway, which I also find (see KEGG results below.)     
+-  (Their KEGG analysis is very strange though...there are only 3 genes significantly upregulated that make up this KEGG pathway. It is not a significant q-value, they just seem to be plotting whatever categories their diff expressed genes fall into.)   
+
+# KEGG pathways 
+
+## Identification of KEGG terms using GAGE 
+
+```{r message = FALSE, echo = FALSE}
+library(pathview)
+library(gage)
+library(ggplot2)
+row.names(resultsRemoveOutlier) = resultsRemoveOutlier$X
+resultsRemoveOutlier1 = resultsRemoveOutlier
+resultsRemoveOutlier1$X = NULL
+#convert flybase ID to Entrez ID 
+id.map.refseq <- id2eg(ids = row.names(resultsRemoveOutlier1), org="Dm", category = c("FLYBASE")) 
+entrezresultsRemoveOutlier1 <- mol.sum(mol.data = resultsRemoveOutlier1, id.map = id.map.refseq, sum.method = "mean")
+A_entrezresultsRemoveOutlier1 = as.data.frame(entrezresultsRemoveOutlier1)
+library(tidyverse)
+deseq2.res <- A_entrezresultsRemoveOutlier1
+out.suffix="deseq2"
+
+deseq2.res = rownames_to_column(deseq2.res)
+deseq2.res = deseq2.res[,c(1,3)]
+deseq2.res = na.omit(deseq2.res)
+deseq2.res = remove_rownames(deseq2.res)
+deseq2.res= column_to_rownames(deseq2.res, var = 'rowname')
+exp.fc = deseq2.res
+#need a vector of log2 fold change values
+
+```
+
+This is the main function of the program, gage(). It will determine the KEGG pathway enrichment. 
+```{r message = FALSE}
+require(gage)
+dmel=kegg.gsets(species = "dme", id.type = "entrez", check.new=FALSE)  #id.type can be "kegg" or "entrez". Entrez Gene is the primary KEGG gene ID for many common model organisms, so these two options have the same effect. For non-model organisms, primary KEGG gene IS is not the same as Entrez ID. I converted by flybase IDs to Entrez IDs in the code above.
+
+fc.kegg.p.UpAndDown <- gage(exp.fc, gsets = dmel$kg.sets, ref = NULL, samp = NULL, same.dir=TRUE) #genes as rows and samples as columns 
+fc.kegg.p.UpAndDown
+#same.dir = TRUE means it will analyze up- and down-regulated separately. 
+```
+
+# Upregulated 
+```{r}
+# upregulated:
+subset(fc.kegg.p.UpAndDown$greater[,1:5], fc.kegg.p.UpAndDown$greater[ ,3]<0.3)
+```
+
+# Downregulated 
+```{r}
+# downregulated:
+subset(fc.kegg.p.UpAndDown$less[,1:5], fc.kegg.p.UpAndDown$less[ ,3]<0.3)
+#lapply(fc.kegg.p.UpAndDown, head)
+```
+
+## Conclusions from KEGG:
+- KEGG pathways with significant p-values for upregulated genes: autophagy, mitophagy, starch and sucrose metabolism   
+      - Maybe *Wolbachia* causes increased starch and sucrose metabolism because it is using up host starch and sugar resources. Autophagy and mitophagy could be indicative of stress.     
+      - I don't know why the GO terms are not really reflective of these 3 significant KEGG terms...Maybe the descriptions are very different. Or maybe am doing something wrong with thr KEGG analysis.   
+      - The other top KEGG terms that show up but are not significant include: Nucleotide excision repair, Fanconi anemia pathway, DNA replication, Mismatch repair, recombination.  
+      
+- KEGG pathways with significant p-values for downregulated genes: Ribosome !   
+      - This is consistent with the many GO terms for ribosome assembly and function that are associated with the genes in this dataset.   
+- "starch and sucrose metabolism" is an enriched KEGG pathway in the He et al dataset too.   
+
+## Literature support:
+  - It seems, from a cursory review of the literature, that drosophila regulate wolbachia endosymbionts through autophagy.  
+  
+  - *Autophagy regulates Wolbachia populations across diverse symbiotic associations* Voronin et al. 2012
+  
+  - "Here we show that autophagy, a conserved intracellular defense mechanism and regulator of cell homeostasis, is a major immune recognition and regulatory process that determines the size of Wolbachia populations. The regulation of Wolbachia populations by autophagy occurs across all distinct symbiotic relationships and can be manipulated either chemically or genetically to modulate the Wolbachia population load."    
+  - "periods of rapid population growth and expansion were accompanied by activation of the autophagy pathway and that chemical and genetic manipulation of this pathway could regulate bacterial populations directly at a level equivalent to that achieved with antibiotic treatment."   
+  
+## Overall Conclusions 
+- The data show strong genotype and batch effects. Though genotype may exert a stronger effect than batch?
+- I think there is a signal for meiosis genes. Most are upregulated, except for *ord* which is the most signficantly differentially expressed, downregulated by 3.2X  
+- Look into *ord* more   
+-There is a strong signal that ribosome assembly and translation is downregulated. This is consistent with Christenson et al.   
+- KEGG analysis confirms this finding from GO analysis.   
+- KEGG analysis indicates that Starch and sucrose metabolism is upregulated, consistent with He et al 2019  
+- KEGG also indicates Autophagy and mitophagy is upregulated. This could be indicative of stress, or could be the natural response to regulate *Wolbachia*. Autophagy is a recognized form of *Wolbachia* regulation. It has been functionally validated in nematodes. (Voronin et al 2012)   
+

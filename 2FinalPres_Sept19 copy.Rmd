@@ -1,0 +1,470 @@
+---
+title: "The Molecular Mechanisms of Wolbachia-Induced Recombination Rate Plasticity in Drosophila melanogaster"
+author: "Sophia Frantz"
+date: "9/16/2019"
+output: revealjs::revealjs_presentation
+---
+
+
+# Goals of this Meeting:
+## Goals of this Meeting:
+- Present my findings of the analysis of RNA-seq from ovaries of wolbachia-infected and -uninfected drosophila. 
+- Determine whether there is a story for this paper.
+- What information (from previous literature, etc.) should be gathered in order to craft the story? 
+- What additional analyses should be performed?
+- What figures should be included?
+
+## Roadmap of presentation:
+- brief background of the project
+- multivariate and ordination results
+- gene enrichment results and comparisons to the literature 
+
+## Brief Background
+- Recombination rate (the defined here as the proportion of recombinant offspring produced) is plastic in Drosophila in response to temperature, maternal age, starvation, and parasite presence. 
+- Recombination rate also exhibits plasticity in response to Wolbachia presence. Wolbachia colonizes the ovaries and is maternally transmitted.
+- It can exhibit various effects on its host (this is an active area of research...including in the Singh lab). It can cause cytoplasmic incompatibility, male-killing, protection against viruses, increased reproductive output, etc. 
+- Basically, HARMFUL or BENEFICIAL or NEUTRAL depending on the context. (good to keep this in mind, might be important for interpreting results)
+
+## ---
+- Singh 2019 study that prompted my project: 
+- Recombination rate increses in Wolbachia-infected flies. 
+
+```{r echo=FALSE, message= FALSE}
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Singh2019_Results.jpg" )
+plot(myimg, axes=FALSE)
+```
+
+## Purpose of my Project:
+- What is the Drosophila ovarian response to Wolbachia infection?
+-	Can the transcriptional response help to explain the observed increased recombination of Wolbachia-infected flies?
+
+## My hypotheses at the beginning of this project:
+- We will see a large change in the transcription of recombination and meiosis genes. 
+- We will see upregulation of immunity genes as part of the Drosophila response to Wolbachia.
+- We will see changes in metabolism genes, as has been noted in previous literature of Wolbachia-infected Drosophila gonads (Christenson 2016, Zheng et al 2011). 
+
+## Project design 
+> - Factor with 2 conditions: infected and uninfected  
+> - Factor with 4 conditions: 4 genotypes (RAL73, RAL783, RAL306, RAL853)  
+    - 4 replicates of each genotype  
+
+> - 2 batches: RAL73/RAL783 & RAL306/RAL853  
+
+> - Main Question: --> What is the effect of infection status, controlling for genotpye?
+
+## Considerations before diving in to the results: 
+> - Batch effect 
+> - Outlier sample 
+> - I eventually end up taking out the outlier and performing analyses this way, because it is just so crazy. 
+> - I talk about the batch effect and the results of controlling for batch effect later. 
+
+# Permutational Multivariate Analysis of Variance (perMANOVA): What percent of the variation in the data can be explained by treatment status? By genotype? By batch?
+
+##  perMANOVA tests for multivariate transcriptional differences between wolbachia-infected and -uninfected drosophila 
+## ----
+- This test answers: What proportion of transcriptome dissimilarity is explained by infection status? What proportion is explained by genotype? My prediction: based on ordination plots, I think a lot of variation will be explained by genotype, and much less will be explained by infection status. 
+
+- <small> I want to do this analysis to know whether infection status drastically changes gene expression in the ovaries of drosophila.  A treatment or process in some systems can greatly impact overall gene expression, while in others the effect may be more subtle. For example, pregnancy status explains 26% of overall dissimilarity in gene expression among pregant and non-pregnant male pipefish individuals. This is a major effect on overall transcription in pipefish. I think this large effect is not to be expected in this study. There are many processes occuring in the ovaries at this stage. Wolbachia will not affect all of them, and other factors such as random fluctuations (due to batch), or genotype may affect these processes more. Of the processes it does effect, I think the transcriptional response will be moderate. Because Wolbachia are endosymbionts and are widespread, they have to be able to live in the host without disrupting host functions so much that it would eject Wolbachia. </small>
+
+## ----
+```{r message=FALSE, echo=FALSE}
+#install.packages("vegan")  #the adonis() function will do the permutation analysis
+library(vegan)
+library(tibble)
+library(dplyr)
+```
+
+```{r message=FALSE, echo=FALSE}
+#Targets links samples with infection status -- samples are rownames, infection status is columns. Will modify the metadata file 
+countDat = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+metadata = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/metadata_withBatch.csv", header=TRUE, row.names = 1) 
+Targets = rownames_to_column(metadata)
+Targets = Targets[,c(1,2,3,4,5)]
+Targets = remove_rownames(Targets)
+Targets = column_to_rownames(Targets, var = "rowname")
+otu.env = Targets
+
+#will need the normalized expression values (countDat)
+countDat2 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+dim(countDat2)
+countDat2 = t(countDat2)  #transposes a matrix 
+dis = vegdist(countDat2) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity. 
+```
+
+## ---- 
+```{r}
+adonis(dis ~ treatment*genotype, strata = otu.env$genotype, data = otu.env, perm=999)  
+# permutations set at 999; this can change. 
+# strata ensures randomizations will occur within each genotype, not across genotypes.
+```
+
+## Permanova test conclusions
+-  6% is explained by treatment status  
+- 31% of the total dissimilarity among samples is explained by genotype. This R2 value has a high degree of significance -- 0.002.   
+  - This is less than I thought! This means there is a lot of residual / background variables influencing the variance.   
+- infection status accounts for a very small proportion of the variance.   
+
+## perMANOVA batch test:
+- This time I do not ask for the contribution of genotype but of batch. 
+
+```{r}
+adonis(dis ~ batch, data = otu.env, strata = otu.env$treatment, perm=999)
+```
+
+## perMANOVA batch test conclusions:
+
+- So, 19% of the dissimilarity can be explained by the batch effect. This probably includes within it some of the genotype effect, since there are 2 genotypes in each batch.  
+- Genotype and batch are imperfectly confounded. It is difficult to make conclusions about each individual contribution to the total dissimilarity.  
+- My first naive intepretation of this result is that the batch effect does not affect the variation as much as the genotype effect. Not sure if this is true, or if instead there is no true way to parse out the batch and genotype effect in this data since they are confounding (albeit imperfectly).  
+
+-See more about the batch effect in the section "More on the Batch Effect" 
+
+
+## perMANOVA test on the outlier-corrected data 
+
+-I hypothesize that when I get rid of the outlier sample, I will see that more of the variation is explained by both genotype and infection status. 
+```{r message=FALSE, echo = FALSE}
+#Targets links samples with infection status -- samples are rownames, infection status is columns. Will modify the metadata file 
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+countDat3$RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam = NULL
+IDs = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs2")
+names(countDat3) = IDs[1:31,1]
+dim(countDat3)
+countDat3 = t(countDat3)  #transposes a matrix 
+dis1 = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity.
+metadata = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/metadata_withBatch_withoutOutlier.csv", header=TRUE, row.names = 1) 
+Targets = rownames_to_column(metadata)
+Targets = Targets[,c(1,2,3,4,5)]
+Targets = remove_rownames(Targets)
+Targets = column_to_rownames(Targets, var = "rowname")
+otu.env = Targets
+#will need the normalized expression values (countDat)
+dim(countDat3)
+countDat2 = t(countDat3)  #transposes a matrix 
+dis = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity. 
+adonis(dis ~ treatment*genotype, strata = otu.env$genotype, data = otu.env, perm=999) 
+```
+
+## Results of perMANOVA test on outlier-removed data 
+> - Using the outlier-removed data changes the results of the perMANOVA test. 
+> - The percent of the variation explained by treatment has not changed -- it is still 6%. But the percent explained by genotype has now increased to 43% (up from 31%). 
+> - The treatment*genotype has decreased slightly but is still not significant. 
+> - Conclusion: I think this big change in how much is accounted for, along with the ordination plots which we will see in a minute, support my dropping this outlier sample for subsequent analyses. 
+
+# Ordination methods purpose
+## Ordination methods purpose
+- Purpose: PCA allows us to visualize the variation in the data in two dimensions. These two dimensions explain a proportion of the total variation. We can then map traits/ groups onto the samples to see if the samples cluster together based on the trait/group. 
+-  These methods are not as pertinent to the more relevant, more specific question of "What genes in the ovaries are affected by Wolbachia infection?" It is asking: "How much does Wolbachia infection affect gene expression-- aka How much does Wolbachia infection explain the variance in gene expression among samples? What affects gene expression more --genotype or infection?" These questions are not as informative for identifying the genes associated with *Wolbachia* infecton, but the answers to these questions will help me interpret the results of the specific question of which genes are affected. 
+
+## PCA plot 
+```{r message=FALSE, echo =FALSE}
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/pca_shapeColor_Infection_Geno.jpg" )
+plot(myimg, axes=FALSE)
+```
+
+## PCA conclusions
+> - 60% of the variance (on the x-axis) is not really explained by treatment or genotype...  
+> - We can see grouping by genotype on the y-axis.   
+> - We can also see that the batches are clustered together. RAL73 and RAL783 seem to be more similar to each other than RAL306 and RAL853.   
+> - Cannot tell from the PCA that there is an outlier sample.   
+
+# PCoA
+## why PCoA
+> - Bray-Curtis is less sensitive to total gene count and absences. It is also not as strongly dominated by single large distances. 
+> - After calculating the distances among all samples, PCoA then plots the distances in multi-dimensional space (n-1 dimensions). So, in this case since we have 32 samples it plots the samples in 31 dimensions. But humans cannot see in 31 dimensions. SO, we have to use PCA to collapse the data back down to 2D space.
+> - This method allowed me to find the outlier !
+
+## PCoA plot with outlier code 
+
+```{r eval = FALSE}
+library(vegan)
+#will need the normalized expression values (countDat)
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+IDs = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs")
+names(countDat3) = IDs[1:32,1]
+dim(countDat3)
+countDat3 = t(countDat3)  #transposes a matrix 
+dis1 = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity.
+PCoA.res<-capscale(dis1~1,distance="bray")
+plot = plot(PCoA.res)
+#labelPoints(offs = 0.10, cex = 0.8)
+points(PCoA.res, cex = 1, col = "dark red")
+```
+## PCoA with Outlier Plot 
+
+```{r message=FALSE, echo = FALSE}
+library(vegan)
+#will need the normalized expression values (countDat)
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+IDs = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs")
+names(countDat3) = IDs[1:32,1]
+dim(countDat3)
+countDat3 = t(countDat3)  #transposes a matrix 
+dis1 = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity.
+PCoA.res<-capscale(dis1~1,distance="bray")
+plot = plot(PCoA.res)
+#labelPoints(offs = 0.10, cex = 0.8)
+points(PCoA.res, cex = 1, col = "dark red")
+```
+
+
+## PCoA with the outlier sample removed:
+```{r echo=FALSE, message=FALSE}
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+countDat3$RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam = NULL
+IDs2 = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs2")
+names(countDat3) = IDs[1:31,1]
+dim(countDat3)
+countDat3 = t(countDat3)  #transposes a matrix 
+dis1 = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity.
+PCoA.res<-capscale(dis1~1,distance="bray")
+plot = plot(PCoA.res)
+points(PCoA.res, cex = 1, col = "dark red")
+```
+
+## Conclusions 
+-Without the outlier it is easier to see that there is grouping based on batch and genotype (I have a nicely labeled NMDS plot below, where it is even easier to see these groupings.)
+
+```{r message=FALSE, results="hide", echo = FALSE}
+vare.mds = metaMDS(countDat3, k=3, try=50, trymax=100)
+```
+
+# NMDS plot with labeling  
+## ----
+```{r}
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/NMDS.png" )
+plot(myimg, axes = FALSE)
+```
+
+## NMDS plot interpretation 
+
+> - The different colors/shapes are the different genotypes. A filled shape means infected, unfilled is uninfected. The ellipses are drawn based on the standard deviation of the sample point values. 
+> - It is easier to see now that the batches group together. 73 and 783 are in the top left, and 306 and 853 are in the bottom right. 853wA and 853wB are creeping up close to the 73/783 cluster, with the rest of that batch further away. 73 and 783 are more similar than the 853 and 306 batch. 
+> - Infection status is not affecting the dissimilarity in any way that is noticable on the visualization. 
+
+# More on the Batch Effect 
+
+## 2 ways to analyze batch effect:
+- 1
+- What I call design1 below. This uses all 32 samples. It tests, what is the effect of infection status (treatment) while controlling for batches? The advantage of this design is that it does not decrease power by splitting up the samples into 2 x 16. It allows us to use all 32 samples at once. However, in this design we cannot explicitly test for the effect of genotype. In a roundabout way we sort of test for genotype because the genotype is imperfectly confounded with batch. 
+
+## 2 ways to analyze batch effect:
+- 2
+- What I call design2 below. This is actually 2 separate analyses, splitting up the samples according to batch so that there are 16 samples within each test. It splits the samples into separate batches and then asks, what is the effect of infection status (treatment) while controlling for genotype? It controls for genotype within each batch. The advantage of this design is that it allows us to still test for the effect of genotype. However, we can only test 2 genotypes at a time, which gives us less power to test the main effect of infection status, because we have only 16 samples in each test. 
+
+```{r echo = FALSE}
+resultsBatchOverall = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/resultsBatch", header = TRUE) 
+resultsGenoWithinBatch1 = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/BatchAndOutliers/resultsGenoWithinBatch1", header=TRUE)
+resultsGenoWithinBatch2 = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/BatchAndOutliers/resultsGenoWithinBatch2", header=TRUE )
+Treatment_Control_Geno = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/Treatment_Control_Geno.csv", header = TRUE) 
+```
+
+## Comparisons: Venn Diagram of significant genes identified in batch analysis (Batch design 1) vs. in genotype analysis: 
+
+```{r message=FALSE}
+library(VennDiagram)
+batch_design1_genes = resultsBatchOverall[which(resultsBatchOverall$padj < 0.05),]
+batch_design1_genes = batch_design1_genes$X
+genotype_genes = Treatment_Control_Geno[which(Treatment_Control_Geno$padj < 0.05),]
+genotype_genes = genotype_genes$X
+vennD = venn.diagram(x = list(batch_design1_genes, genotype_genes), category.names = c("batch genes", "genotype genes"), filename = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batch_design1_geno_comparison.png")
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batch_design1_geno_comparison.png" )
+```
+
+## ----
+```{r}
+plot(myimg, axes = FALSE)
+```
+
+## Conclusions batch effect 
+- ? The genes that are significant for the batch design are a subset of the genes significant for the genotype design, except for 7 genes which are unique to batch. 
+- from my perMANOVA test, I also found that the percent variation attributable to the batch effect is lower than the percent atrributable to genotype. Genotype accounts for more of the variation. 
+- Hmm but actually I don't know if I am interpreting this correctly. 
+
+## Venn Diagram of genes identified between the 2x16 analyses of design2. 
+
+```{r message= FALSE, echo=FALSE}
+batch1_genes = resultsGenoWithinBatch1[which(resultsGenoWithinBatch1$padj < 0.05),]
+batch1_genes = batch1_genes$X
+batch2_genes = resultsGenoWithinBatch2[which(resultsGenoWithinBatch2$padj < 0.05),]
+batch2_genes = batch2_genes$X
+vennD = venn.diagram(x = list(batch1_genes, batch2_genes), category.names = c("batch 1", "batch 2"), filename = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batches_design2_comparison.png")
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batches_design2_comparison.png" )
+plot(myimg, axes = FALSE)
+```
+
+# Conclusions batch effect
+## Conclusions batch effect
+- Only 12 genes in common among all sets.  
+- There is a big difference between the number of significant genes found in batch 1 (458) vs. batch 2 (84). I don't know why this could be.
+- OK I JUST CHECKED one reason this could be: the batch 1 data is maybe of better quality, because 98% of reads mapped uniquely to the genome (sample average), while in batch 2 an average of 89% if reads mapped to the genome. 
+- I wonder if the outlier could be causing this difference? The outlier is sample RAL73w+A. I will take it out, rerun the analysis, and then see if the number of significant genes is more similar between the 2 batches. 
+
+## Conclusions continued
+-  I should have known this, but removing the outlier *increases* the number of significant genes identified in batch 1.  
+
+```{r message = FALSE, echo = FALSE}
+batch1_noOutlier = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/resultsGenoWithinBatch1_noOutlier", header = TRUE)
+batch1_genes_noOutlier = batch1_noOutlier[which(batch1_noOutlier$padj < 0.05),]
+batch1_genes_noOutlier = batch1_genes_noOutlier$X
+vennD = venn.diagram(x = list(batch1_genes_noOutlier, batch2_genes), category.names = c("b1 no Outlier", "batch 2"), filename = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batches_design2_noOutlier_comparison.png")
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/Plots_June/batches_design2_noOutlier_comparison.png" )
+plot(myimg, axes = FALSE)
+```
+
+## Conclusions continued 
+- The batch design did not really impact which genes were. Genotype always identified more genes.
+- Because of this, I decided to do the GO analyses and searching for significant genes by testing for treatment status controlling for genotype.
+- Maybe I should do these analyses controlling for Batch too...? But which design? And then what would be the next step? Compare whether they both produce similar results from GO analysis? 
+
+# Heatmaps to compare all samples for specific sets of genes. 
+
+```{r message=FALSE, echo=FALSE}
+# load the following: gplots, RColorBrewer, and dendextend. 
+library("gplots")
+library("RColorBrewer")
+library("dendextend")
+```
+
+## downregulated genes 
+- For the lowest nested significant GO terms: ribosomal large subunit assembly, maturation of LSU-rRNA from tricistronic rRNA transcript (SSU-rRNA, 5.8S rRNA, LSU-rRNA), cytoplasmic translation, translational initiation, tRNA modification 
+
+```{r message=FALSE}
+# work with a file that contains expression data just for the genes of interest. (the raw counts? normalized? see the matrices for the ordination plots above--I think it needs something like that.)
+resultsRemoveOutlier = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/BatchAndOutliers/resultsTrtControlGeno_RemoveOutlier", header = TRUE) 
+genes_noOutlier = resultsRemoveOutlier[which(resultsRemoveOutlier$padj < 0.05),]
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+#remove the outlier sample! 
+countDat3= subset(countDat3, select = -c(RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam) )
+countDat3 = as.data.frame(countDat3)
+countDat3_diffGenes = countDat3
+countDat3_diffGenes = rownames_to_column(countDat3_diffGenes)
+
+#ribosome and translation most nested terms from Panther (downregulated):
+riboGenes= c("FBgn0002593","FBgn0002622","FBgn0003274","FBgn0003279","FBgn0004403","FBgn0004404","FBgn0010078","FBgn0010339","FBgn0011272","FBgn0011284","FBgn0014026","FBgn0015756","FBgn0020910","FBgn0021874","FBgn0025629","FBgn0028697","FBgn0028707","FBgn0029785","FBgn0029897","FBgn0030720","FBgn0032138","FBgn0032430","FBgn0032518","FBgn0032793","FBgn0033317","FBgn0033485","FBgn0033555","FBgn0033902","FBgn0034214","FBgn0034743","FBgn0034748","FBgn0034968","FBgn0036213","FBgn0036825","FBgn0037351","FBgn0037816","FBgn0037899","FBgn0037899","FBgn0038277","FBgn0038585","FBgn0039713","FBgn0039857","FBgn0260441","FBgn0261602","FBgn0283659","FBgn0285948","FBgn0015834","FBgn0022023","FBgn0033902","FBgn0034654","FBgn0034915","FBgn0036258","FBgn0086706","FBgn0263740","FBgn0032518","FBgn0263740","FBgn0052281","FBgn0261609","FBgn0032298") 
+
+countDat3_diffGenes = subset(countDat3_diffGenes, countDat3_diffGenes[[1]] %in% riboGenes)
+countDat3_diffGenes = remove_rownames(countDat3_diffGenes)
+countDat3_diffGenes = column_to_rownames(countDat3_diffGenes, var = 'rowname')
+IDs = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs2")
+names(countDat3_diffGenes) = IDs[1:31,1]
+dim(countDat3_diffGenes)
+countDat3_diffGenes <- log2(countDat3_diffGenes + 0.01) # add 0.01 in case the log function results in 0, then we cannot use 0, but we use 0.01 as stand-in, close to 0
+countDat3_diffGenes.n <- scale(t(countDat3_diffGenes))
+countDat3_diffGenes.tn <- t(countDat3_diffGenes.n) # put back in original orientation. 
+dis1_countDat3_diff <- dist(countDat3_diffGenes.n, method = "euclidean", diag = FALSE,
+upper = FALSE) #calculate multivariate dissimilarity for all SAMPLE pairs, using Euclidean Distance
+dis2_countDat3_diff <- dist(countDat3_diffGenes.tn,method = "euclidean", diag = FALSE, upper = TRUE)
+
+names_upreg <- read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/femaleGameteGeneNames", header=FALSE) #define a vector of gene names, to use later to label the heatmap. 
+
+names<- countDat3_diffGenes$name
+
+heatmap.c1 <- hclust(dis1_countDat3_diff, method = "ward.D2", members = NULL)
+heatmap.c2 <- hclust(dis2_countDat3_diff, method = "ward.D2", members = NULL)
+heatmap.c1$order
+pal <- colorRampPalette(c("green", "yellow", "red"))
+pal(299)
+```
+
+## ----
+```{r echo = FALSE}
+heatmap.2(countDat3_diffGenes.tn, Colv=rotate(as.dendrogram(heatmap.c1),order=c( 4.6,1,7,2,3,18,19,30,31, 26,25,27,13,14,28,29,15,21,24,5,8,11,12,9,10,17,20,16,22,23)), Rowv=as.dendrogram(heatmap.c2), labRow=names, density.info="none", trace="none",scale="none", col = pal,cexRow=0.5, cexCol=0.75, margins=c(3,13), lwid=c(.8,3), lhei=c(.8,3), srtCol=45, adjCol=c(1,1), keysize=1.3)
+```
+
+## Downregulated ribo and translation genes conclusions
+- there is  separation between the uninfected (to the left) samples and the infected samples.... 
+- it seems like these samples drive the pattern ... there is not much separation between w+ and w- apart from the samples on the left. And the genotypes are also randomly assorted I think.
+
+# Meiosis Genes from Previous literature (McKim, Hunter, Presgraves): Heatmap
+## Code 
+```{r eval = FALSE}
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+#remove the outlier sample! 
+countDat3= subset(countDat3, select = -c(RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam) )
+countDat3 = as.data.frame(countDat3)
+countDat3_diffGenes = countDat3
+countDat3_diffGenes = rownames_to_column(countDat3_diffGenes)
+countDat3_diffGenes = subset(countDat3_diffGenes, countDat3_diffGenes[[1]] %in% c("FBgn0002924","FBgn0003009","FBgn0003545","FBgn0261278", "FBgn0267487", "FBgn0283521", "FBgn0000140","FBgn0002899","FBgn0002906","FBgn0003009","FBgn0003545","FBgn0011606","FBgn0017577","FBgn0040283"))
+countDat3_diffGenes = remove_rownames(countDat3_diffGenes)
+countDat3_diffGenes = column_to_rownames(countDat3_diffGenes, var = 'rowname')
+IDs = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs2")
+names(countDat3_diffGenes) = IDs[1:31,1]
+dim(countDat3_diffGenes)
+countDat3_diffGenes <- log2(countDat3_diffGenes + 0.01) # add 0.01 in case the log function results in 0, then we cannot use 0, but we use 0.01 as stand-in, close to 0
+countDat3_diffGenes.n <- scale(t(countDat3_diffGenes))
+countDat3_diffGenes.tn <- t(countDat3_diffGenes.n) # put back in original orientation. 
+dis1_countDat3_diff <- dist(countDat3_diffGenes.n, method = "euclidean", diag = FALSE,
+upper = FALSE) #calculate multivariate dissimilarity for all SAMPLE pairs, using Euclidean Distance
+dis2_countDat3_diff <- dist(countDat3_diffGenes.tn,method = "euclidean", diag = FALSE, upper = TRUE)
+
+names_upreg <- read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/femaleGameteGeneNames", header=FALSE) #define a vector of gene names, to use later to label the heatmap. 
+
+names<- countDat3_diffGenes$name
+
+heatmap.c1 <- hclust(dis1_countDat3_diff, method = "ward.D2", members = NULL)
+heatmap.c2 <- hclust(dis2_countDat3_diff, method = "ward.D2", members = NULL)
+heatmap.c1$order
+pal <- colorRampPalette(c("green", "yellow", "red"))
+pal(299)
+#par(cex.main=0.5, cex.axis=0.5, font=2, font.axis=2) # Shrink title fonts on plot 
+```
+
+## Heatmap for Meiosis Genes 
+
+```{r message=FALSE, echo = FALSE}
+library(imager)
+myimg <- load.image("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/HeatmapUpregMeiosis.png" )
+plot(myimg, axes=FALSE)
+```
+
+- On the right, the w+ samples from RAL783 and RAL853 are very different from the rest of the samples for almost all the genes.
+- I think these heatmaps are a good way to find which genes have a consistent pattern - which genes show most w+ samples separated from w- samples. Even if there is a small effect, consistency is a good sign. It allows us to separate whether one sample is really pulling the results of the differential expression. 
+
+
+## Heatmap for Meiosis Genes 
+-(better quality image?)
+
+## Meiosis Genes from Previous literature (McKim, Hunter, Presgraves): Heatmap
+```{r message = FALSE}
+countDat3 = read.csv("/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+#remove the outlier sample! 
+countDat3= subset(countDat3, select = -c(RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam) )
+countDat3 = as.data.frame(countDat3)
+countDat3_diffGenes = countDat3
+countDat3_diffGenes = rownames_to_column(countDat3_diffGenes)
+countDat3_diffGenes = subset(countDat3_diffGenes, countDat3_diffGenes[[1]] %in% c("FBgn0002924","FBgn0003009","FBgn0003545","FBgn0261278", "FBgn0267487", "FBgn0283521", "FBgn0000140","FBgn0002899","FBgn0002906","FBgn0003009","FBgn0003545","FBgn0011606","FBgn0017577","FBgn0040283"))
+countDat3_diffGenes = remove_rownames(countDat3_diffGenes)
+countDat3_diffGenes = column_to_rownames(countDat3_diffGenes, var = 'rowname')
+IDs = read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/DESeq_dataframes/IDs2")
+names(countDat3_diffGenes) = IDs[1:31,1]
+dim(countDat3_diffGenes)
+countDat3_diffGenes <- log2(countDat3_diffGenes + 0.01) # add 0.01 in case the log function results in 0, then we cannot use 0, but we use 0.01 as stand-in, close to 0
+countDat3_diffGenes.n <- scale(t(countDat3_diffGenes))
+countDat3_diffGenes.tn <- t(countDat3_diffGenes.n) # put back in original orientation. 
+dis1_countDat3_diff <- dist(countDat3_diffGenes.n, method = "euclidean", diag = FALSE,
+upper = FALSE) #calculate multivariate dissimilarity for all SAMPLE pairs, using Euclidean Distance
+dis2_countDat3_diff <- dist(countDat3_diffGenes.tn,method = "euclidean", diag = FALSE, upper = TRUE)
+
+names_upreg <- read.csv(file = "/Users/sophia/Documents/RNAseq_Dmel_Wol/Round2/femaleGameteGeneNames", header=FALSE) #define a vector of gene names, to use later to label the heatmap. 
+
+names<- countDat3_diffGenes$name
+
+heatmap.c1 <- hclust(dis1_countDat3_diff, method = "ward.D2", members = NULL)
+heatmap.c2 <- hclust(dis2_countDat3_diff, method = "ward.D2", members = NULL)
+heatmap.c1$order
+pal <- colorRampPalette(c("green", "yellow", "red"))
+pal(299)
+#par(cex.main=0.5, cex.axis=0.5, font=2, font.axis=2) # Shrink title fonts on plot 
+```
+
+## Heatmap Meiosis Literature Genes
+```{r echo = FALSE}
+heatmap.2(countDat3_diffGenes.tn, Colv=rotate(as.dendrogram(heatmap.c1), order = c(13,15,28,29,14,21,22,23,7,11,9,10,12,2,8,5,20,16,17,26,24,25,27,18,3,19,30,31,4,1,6)), Rowv=as.dendrogram(heatmap.c2), labRow=names, density.info="none", trace="none",scale="none", col = pal,cexRow=0.5, cexCol=0.75, margins=c(3,13), lwid=c(.8,3), lhei=c(.8,3), srtCol=45, adjCol=c(1,1), keysize=1.3)
+```
+ 

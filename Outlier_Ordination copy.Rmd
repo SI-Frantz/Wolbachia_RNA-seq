@@ -1,0 +1,133 @@
+---
+title: "Outlier Ordination"
+output: html_document
+---
+
+**PCA** 
+
+This is the default PCA method from DESeq2:
+
+```{r message=FALSE, echo=FALSE}
+library(imager)
+myimg <- load.image("/Users/sophia/Dropbox/Round2/Plots_June/pca_shapeColor_Infection_Geno.jpg" )
+plot(myimg)
+```
+
+The outlier sample did not even make it on to the plot. There are only 3 green triangles (the symbol for RAL73 infected), when there should be 4, one for each replicate.
+
+
+**PCoA using Bray-Curtis dissimilarity**
+
+ PCoA with the outlier included: 
+
+```{r message=FALSE, echo =FALSE}
+library(vegan)
+library(MASS)
+#will need the normalized expression values (countDat)
+countDat = read.csv("/Users/sophia/Dropbox/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+IDs = read.csv(file = "/Users/sophia/Dropbox/Round2/DESeq_dataframes/IDs")
+names(countDat) = IDs[1:32,1]
+countDat = t(countDat)  #transposes a matrix 
+dis = vegdist(countDat)
+
+countDat3 = read.csv("/Users/sophia/Dropbox/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+IDs2 = read.csv(file = "/Users/sophia/Dropbox/Round2/DESeq_dataframes/IDs2")
+names(countDat3) = IDs2[1:31,1]
+#dim(countDat3)
+countDat3 = t(countDat3)  #transposes a matrix 
+dis1 = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity.
+#pdf("/Users/sophia/Desktop/test1")
+```
+
+```{r}
+PCoA.res<-capscale(dis~1,distance="bray")
+plot = plot(PCoA.res)
+#labelPoints(offs = 0.10, cex = 0.8)
+points(PCoA.res, cex = 1, col = "dark red")
+```
+
+The points are too close together because the x-axis is large in order to accomodate the very different sample, RAL73wA. Because it is far away, the other points are too close together to make out what is going on.
+
+So here is the PCoA with RAL73 wolbachia-infected removed, in order to better visualize the rest of the samples: 
+
+```{r message=FALSE}
+countDat3 = read.csv("/Users/sophia/Dropbox/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+countDat3$RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam = NULL
+IDs2 = read.csv(file = "/Users/sophia/Dropbox/Round2/DESeq_dataframes/IDs2")
+names(countDat3) = IDs[1:31,1]
+dim(countDat3)
+countDat3 = t(countDat3)  #transposes a matrix 
+dis1 = vegdist(countDat3) #calculate the distances between samples. A dissimilarity matrix. Uses Bray-Curtis dissimilarity.
+PCoA.res<-capscale(dis1~1,distance="bray")
+plot = plot(PCoA.res)
+points(PCoA.res, cex = 1, col = "dark red")
+```
+
+Without the outlier it is easier to see that there is grouping based on batch and genotype (I have a nicely labeled NMDS plot below, where it is even easier to see these groupings.)
+
+
+**NMDS Plot** 
+
+NMDS is non-metric and is yet another way to visualize multivariate data. It also uses Bray-Curtis dissimilarity. 
+
+```{r message=FALSE}
+library(vegan)
+library(MASS)
+data.mds0 = isoMDS(dis, k=2, maxit=100) #the result of this function isoMDS is a list of items (points, stress) for the configuration and the stress. Stress S is a statistic of goodness of fit. 
+stressplot(data.mds0, dis)  #what is this? see below explanation 
+ordiplot(data.mds0, type = "t" )
+```
+
+What is a stress plot?  --> ordination distances are plotted against dissimilarities, and the fit is shown as a monotone step line. Stress is the disagreement between the 2D configuration and the original multi-dimension configuration. We want the 2D plot to preserve the original rank orders, which it will if a plot of the 2d rank orders and the original are plotted and have a positive linear relationship.
+
+With the outlier, you can see that the stress plot is not linear. Instead, it seems to have grouped the dissimilarity scores into two groups: the outlier and everything else. 
+
+So here is the stress plot and the NMDS plot without the outlier:
+```{r}
+countDat3 = read.csv("/Users/sophia/Dropbox/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+countDat3 = t(countDat3)
+dis1 = vegdist(countDat3) 
+data.mds01 = isoMDS(dis1, k=2)
+stressplot(data.mds01, dis1)  #what is this? 
+ordiplot(data.mds01, type = "t")
+```
+
+--> This results in a more linear stress plot! The non-metric fit R2 = 0.975 and the linear fit R2 = 0.885. 
+
+And finally, a NMDS plot that makes it easier to see the genotypes and infection status. This is with the outlier removed. (I used metaMDS() instead of isoMDS() because metaMDS() does more iterations and may be more accurate with finding a better agreement between 2D and multidimensional space. With isoMDS() the iteration "easily gets trapped into local optimum instead of using several random starts." (from the vegan tutorial)) 
+
+```{r message=FALSE, results="hide"}
+vare.mds = metaMDS(countDat3, k=3, try=50, trymax=100)
+```
+
+#vare.mds
+#ordiplot(vare.mds$points, type = "t") 
+
+```{r}
+stressplot(vare.mds)
+```
+
+```{r}
+metadata = read.csv("/Users/sophia/Dropbox/Round2/DESeq_dataframes/metadata_withBatch_withoutOutlier.csv", header=TRUE, row.names = 1) 
+
+par(mgp =c(2.5,1,0))
+genotype1=as.character(metadata$genotype)
+
+fig = ordiplot(vare.mds$points, main = "Samples in Transcript Space", ylab="NMDS Dimension 2", xlab="NMDS Dimension 1", font.lab=2, font.axis=2, cex.axis=.7,type="none", cex.main=1)
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[1:8], col="cyan3", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[9:15], col="orange3", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[16:23], col="pink2", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[24:31], col="yellow3", draw="lines")
+
+points(fig, "sites", pch=c(rep(1,4),rep(19,4),rep(0,4), rep(15,3),rep(2,4),rep(17,4),rep(5,4),rep(18,4)), col=c(rep("cyan3",8),rep("orange3",7),rep("pink2",8),rep("yellow3",8)), cex=1.5)
+
+#outline = uninfected, filled shapes = infected 
+```
+
+
+The different colors/shapes are the different genotypes. A filled shape means infected, unfilled is uninfected.  
+It is easier to see that the batches group together. 73 and 783 are in the top left, and 306 and 853 are in the bottom right. 853wA and 853wB are creeping up close to the 73/783 cluster, with the rest of that batch further away. 73 and 783 are more similar than the 853 and 306 batch. Infection status is not affecting the dissimilarity in any way that is noticable on the visualization. 

@@ -1,0 +1,307 @@
+---
+title: "Figures for Wolbachia Drosophila Paper - Draft 1"
+author: "Sophia Frantz"
+date: "1/17/2020"
+always_allow_html: yes
+output: word_document
+---
+
+files and packages:
+```{r  message=FALSE, echo=FALSE, error=FALSE}
+#Differential expression files: 
+batch1_Geno_noOutlier = read.csv(file = "/Users/sfrantz/Desktop/Round2/DESeq_dataframes/resultsGenoWithinBatch1_noOutlier", header = TRUE)
+batch2_Geno = read.csv(file = "/Users/sfrantz/Desktop/Round2/DESeq_dataframes/BatchAndOutliers/resultsGenoWithinBatch2", header=TRUE )
+resultsRemoveOutlier = read.csv(file = "/Users/sfrantz/Desktop/Round2/DESeq_dataframes/BatchAndOutliers/resultsTrtControlGeno_RemoveOutlier", header = TRUE, row.names=1) 
+
+#counts files for permanova: 
+countDat_batch1 = read.csv(file ="/Users/sfrantz/Desktop/Round2/countDat_batch1", header = TRUE, row.names = 1 )
+countDat_batch2 = read.csv(file ="/Users/sfrantz/Desktop/Round2/countDat_batch2", header = TRUE, row.names = 1 )
+#metadata 
+metadata_batch1 = read.csv("/Users/sfrantz/Desktop/Round2/DESeq_dataframes/batch1", header=TRUE, row.names = 1) 
+metadata_batch2 = read.csv("/Users/sfrantz/Desktop/Round2/DESeq_dataframes/batch2", header=TRUE, row.names = 1)  
+  
+#genes list for Venn Diagrams 
+batch1_genes = batch1_Geno_noOutlier[which(batch1_Geno_noOutlier$padj < 0.05),]
+batch1_genes_down = batch1_genes[which(batch1_genes$log2FoldChange < 0),]
+batch1_genes_up = batch1_genes[which(batch1_genes$log2FoldChange > 0),]
+batch2_genes = batch2_Geno[which(batch2_Geno$padj < 0.05),]
+batch2_genes_down = batch2_genes[which(batch2_genes$log2FoldChange < 0),]
+batch2_genes_up = batch2_genes[which(batch2_genes$log2FoldChange > 0),]
+together_genes = resultsRemoveOutlier[which(resultsRemoveOutlier$padj < 0.05),]
+together_genes_down = together_genes[which(together_genes$log2FoldChange < 0),]
+together_genes_up = together_genes[which(together_genes$log2FoldChange > 0),] 
+```
+
+
+```{r}
+#packages:
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("TxDb.Dmelanogaster.UCSC.dm6.ensGene")
+```
+
+
+# Table A: Sequencing Statistics 
+
+```{r  message=FALSE, echo=FALSE, error=FALSE}
+seqStats = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/SeqStats", sep = "\t", header = TRUE)
+seqStats$X = NULL
+
+library(htmlTable)
+htmlTable(seqStats,
+          cgroup = c("Batch 1", "Batch 2"),
+          n.cgroup = c(3,3),
+          header= paste(c("sample ID", "# reads mapped","  %reads mapped","sample ID", "# reads mapped","  %reads mapped")),
+          rnames = FALSE, )
+```
+
+# Fig. A Experimental Design 
+
+To be continued ...
+
+# Fig. B nMDS ordination plot
+
+```{r   message=FALSE, echo=FALSE, error=FALSE, results="hide"}
+library(vegan)
+library(MASS)
+countDat3 = read.csv("/Users/sfrantz/Desktop/Round2/DESeq_dataframes/countDat_for_sva", header = TRUE, row.names = 1)
+#remove the outlier sample! 
+countDat3= subset(countDat3, select = -c(RAL73w_plus_1_S13_L004_R1_001.fastq.gzAligned.sortedByCoord.out.bam) )
+metadata = read.csv("/Users/sfrantz/Desktop/Round2/DESeq_dataframes/metadata_withBatch_withoutOutlier.csv", header=TRUE, row.names = 1) 
+countDat3 = t(countDat3)
+#png(filename = "/Users/sfrantz/Desktop/Round2/NMDS.png")
+par(mgp =c(2.5,1,0))
+genotype1=as.character(metadata$genotype)
+
+vare.mds = metaMDS(countDat3, k=3)
+```
+
+```{r  message=FALSE, echo=FALSE, error=FALSE}
+pdf("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/color_NMDSLegend")
+fig = ordiplot(vare.mds$points, main = "Samples in Transcript Space", ylab="NMDS Dimension 2", xlab="NMDS Dimension 1", font.lab=2, font.axis=2, cex.axis=.7,type="none", cex.main=1) 
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[1:8], col="cyan3", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[9:15], col="orange3", draw="lines")
+
+#ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[16:23], col="pink2", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[24:31], col="yellow3", draw="lines")
+
+points(fig, "sites", col=c(rep("cyan3",8),rep("orange3",7),rep("pink2",8),rep("yellow3",8)),  pch=c(rep(1,4),rep(19,4),rep(1,4), rep(19,3),rep(1,4),rep(19,4),rep(1,4),rep(19,4)), cex=1.5)
+
+#legend("bottomleft", legend = c("RAL73","RAL783", "RAL306", "RAL853"), pch = c(0,2,1,5),
+#col = c("orange3","pink2","cyan3","yellow3"))
+dev.off()
+
+#outline = uninfected, filled shapes = infected 
+```
+
+```{r}
+#black and white version:
+
+#pdf("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/grayscaleNMDS2")
+fig = ordiplot(vare.mds$points, main = "Samples in Transcript Space", ylab="nMDS Dimension 2", xlab="nMDS Dimension 1", font.lab=2, font.axis=2, cex.axis=.7,type="none", cex.main=1) 
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[1:8], col="#C6C6C6", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = FALSE, lwd=2, show.groups = genotype1[9:15], col="#AAAAAA", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[16:23], col="#717171", draw="lines")
+
+ordiellipse(vare.mds$points,groups=genotype1, label = TRUE, lwd=2, show.groups = genotype1[24:31], col="#383838", draw="lines")
+
+points(fig, "sites", col=c(rep("#C6C6C6",8),rep("#AAAAAA",7),rep("#717171",8),rep("#383838",8)),  pch=c(rep(1,4),rep(19,4),rep(1,4), rep(19,3),rep(1,4),rep(19,4),rep(1,4),rep(19,4)), cex=1.5)
+
+#legend("bottomleft", legend = c("RAL73","RAL783", "RAL306", "RAL853"), pch = c(0,2,1,5),
+#col = c("orange3","pink2","cyan3","yellow3"))
+#dev.off()
+
+#outline = uninfected, filled shapes = infected 
+
+## select 4 locations
+#coords <- locator(with(fig, length(4)))
+
+## now you have to click on the plot where you want the labels
+## automagically finishes after you click the 4th label in this case
+
+## draw labels
+#text(coords, labels = c("RAL306", "RAL853", "RAL783", "RAL73"))
+```
+
+
+
+
+
+# Table B: Results of the perMANOVA test 
+
+```{r  message=FALSE, echo=FALSE, error=FALSE}
+perm_results = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/permanova", sep = "\t", header = TRUE)
+names(perm_results) = c( "", "df", "meanSS", "F-value", "R2","p-value","df", "meanSS", "F-value", "R2","p-value")
+
+library(htmlTable)
+htmlTable(perm_results,
+          cgroup = c("factor", "batch 1", "batch2"),
+          n.cgroup = c(1,5,5),
+          rnames = FALSE, )
+```
+
+# Table C: List of Differentially Expressed Genes with fold change >0 and padj <= 0.05 Identified in Batch 1 
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+library(knitr)
+library(kableExtra)
+
+batch1_final = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/batch1_df_DE1", header = FALSE)
+join = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/batch1_geneSymbols")
+batch1_final$geneDescription = join$current_symbol 
+batch1_final$V3 = as.numeric(as.character(batch1_final$V3))
+batch1_final$V11 = as.numeric(as.character(batch1_final$V11))
+batch1_final$V8 = as.numeric(as.character(batch1_final$V8))
+#Modify this: 
+kable(batch1_final[,c(2,12,3,10,11,8)], digits = 3, col.names = c("FlyBase ID","gene Symbol", "base mean", "direction", "fold change", "adj p-value")) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"))
+```
+
+# Table D: List of Differentially Expressed Genes with fold change >0 and padj <= 0.05 Identified in Batch 2
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+join = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/final_batch2", sep = " ", header = FALSE)
+kable(join[,c(1,2,4,10,11,9)], digits = 3, col.names = c("FlyBase ID","gene Symbol", "base mean", "direction", "fold change", "adj p-value")) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"))
+```
+
+
+# Figure C: Comparison of genes identified in batch 1 vs. batch 2 
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+library(dplyr)
+library(kableExtra)
+table1 = read.csv("/Users/sfrantz/Desktop/Round2/GeneLists_dir/TableForFigure2", sep = "\t", header = TRUE)
+names(table1) = c("Gene Name", "Gene Snapshot (FlyBase)", "GO Terms biological process (Panther)", "potentially involved in meiosis?")
+kable(table1[,c(1,3)], digits = 3) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"))
+  #save_kable("Rplot_CommonBatches.png")
+
+#library(VennDiagram)
+#vennD = venn.diagram(x = list(batch1_genes$X, batch2_genes$X), category.names = c("1", "2"), filename = "/Users/sfrantz/Desktop/Round2/Plots_June/batches_design2_comparison.png")
+#library(imager)
+#myimg <- load.image("/Users/sfrantz/Desktop/Round2/Plots_June/batches_design2_comparison.png" )
+#plot(myimg, axes = FALSE)
+
+```
+
+
+# Table E: GO terms Batch 1
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+batch1GO = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/batch1_combinedUpDown_NestedGO", sep = "\t", header = FALSE)
+
+names(batch1GO) = c("GO biological process", "number of genes in genome", "number differentially expressed", "expected", "over/underrepresented", "enrichment", "raw p-value", "FDR") 
+kable(batch1GO[,c(1,2,3,6,8)], digits = 3) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"))
+```
+
+
+# Table F: GO terms Batch 2 
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+batch2GO = read.csv("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/batch2_combinedUpDown_NestedGO", sep = "\t", header = FALSE)
+names(batch2GO) = c("GO biological process", "number of genes in genome", "number differentially expressed", "expected", "over/underrepresented", "enrichment", "raw p-value") 
+#add column: involved in meiosis? Also add the gene names, maybe upregulated genes and downregulated genes in a separate file.
+# No FDR for batch2 
+kable(batch2GO[,c(1,2,3,6,7)], digits = 3) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"))
+```
+
+
+# Figure D: Distribution of Genes Across the Genome 
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+batch1_Geno_noOutlier = read.csv(file = "/Users/sfrantz/Desktop/Round2/DESeq_dataframes/resultsGenoWithinBatch1_noOutlier", header = TRUE, row.names=1)
+  # YOU HAVE TO make sure you set the rownames as the gene names!!! 
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+txdb <- TxDb.Dmelanogaster.UCSC.dm6.ensGene
+dm.genes <- genes(txdb)
+
+mcols(dm.genes) <- batch1_Geno_noOutlier[names(dm.genes), c("log2FoldChange", "stat", "pvalue", "padj")] #make sure results is a dataframe with 6 columns, gene names should be row names, not a column.
+library(karyoploteR)      # YOU HAVE TO make sure you set the rownames as the gene names!!! 
+
+filtered.dm.genes <- dm.genes[!is.na(dm.genes$padj)]
+log.pval <- -log10(filtered.dm.genes$padj)
+mcols(filtered.dm.genes)$log.pval <- log.pval
+#filtered.dm.genes #there are 9,226 genes in this dataframe now.
+#plot the significant genes' log adjusted p-value at their position in the genome on the karyotype:
+sign.genes <- filtered.dm.genes[filtered.dm.genes$padj < 0.05,]
+ordered <- dm.genes[order(dm.genes$padj, na.last = TRUE),]
+top.genes <- ordered[1:20]
+```
+
+Chr 2:
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+#pdf("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/Chr2")
+range(sign.genes$log2FoldChange) # the range is about -4 to 8 
+#fc.ymax <- ceiling(max(abs(range(sign.genes$log2FoldChange))))
+#fc.ymin <- -fc.ymax
+fc.ymax =5
+fc.ymin=-5
+#make the dot represent the adjusted p-value significance - bigger = more significant
+points.top <- 0.8
+cex.val <- sqrt(sign.genes$log.pval)/1.5
+col.over <- "#FFBD07AA"
+col.under <- "#00A6EDAA"
+sign.col <- rep(col.over, length(sign.genes))
+sign.col[sign.genes$log2FoldChange<0] <- col.under
+
+kp <- plotKaryotype(genome="dm6", chromosomes = c("chr2L", "chr2R"), plot.type = 3)  # Change plot.type?? 
+kpPoints(kp, data=sign.genes, y=sign.genes$log2FoldChange, cex = cex.val, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, col=sign.col)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, cex = 0.5)
+kpAddLabels(kp, labels = "log2 fold change", cex = 0.8, srt=90, pos=1, label.margin = 0.045, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+gene.mean <- start(top.genes) + (end(top.genes) - start(top.genes))/2
+#kpSegments(kp, chr=as.character(seqnames(top.genes)), x0=gene.mean, x1=gene.mean, y0=top.genes$log2FoldChange, y1=fc.ymax, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+#kpPlotMarkers(kp, top.genes, labels = names(top.genes), text.orientation = "horizontal", r0=points.top)
+
+#Data panel 2
+kp2 <- kpPlotDensity(kp, data=dm.genes, window.size = 10e4, data.panel = 2, labels = "gene density")
+#kpAddLabels(kp2, labels = "gene density", cex = 0.8, srt=90, pos=1, label.margin = 0.04)
+#dev.off()
+```
+
+Chr 3: 
+
+```{r message=FALSE, echo=FALSE, error=FALSE}
+#pdf("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/Chr3")
+kp <- plotKaryotype(genome="dm6", chromosomes = c("chr3L", "chr3R"), plot.type = 3)  # Change plot.type?? 
+kpPoints(kp, data=sign.genes, y=sign.genes$log2FoldChange, cex = cex.val, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, col=sign.col)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, cex = 0.5)
+kpAddLabels(kp, labels = "log2 fold change", cex = 0.8, srt=90, pos=1, label.margin = 0.045, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+gene.mean <- start(top.genes) + (end(top.genes) - start(top.genes))/2
+#kpSegments(kp, chr=as.character(seqnames(top.genes)), x0=gene.mean, x1=gene.mean, y0=top.genes$log2FoldChange, y1=fc.ymax, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+#kpPlotMarkers(kp, top.genes, labels = names(top.genes), text.orientation = "horizontal", r0=points.top)
+
+#Data panel 2
+kp2 <- kpPlotDensity(kp, data=dm.genes, window.size = 10e4, data.panel = 2)
+#kpAddLabels(kp2, labels = "gene density", cex = 0.8, srt=90, pos=1, label.margin = 0.04)
+
+# Label the points that are over 4X ? There are only 2.
+```
+
+Chromosome 4 and X:
+```{r message=FALSE, echo=FALSE, error=FALSE}
+# pdf("/Users/sfrantz/Desktop/Round2/FinalResults_andFigures_ForPaper/ChrX")
+kp <- plotKaryotype(genome="dm6", chromosomes = c("chr4", "chrX"), plot.type = 3)  # Change plot.type?? 
+kpPoints(kp, data=sign.genes, y=sign.genes$log2FoldChange, cex = cex.val, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, col=sign.col)
+kpAxis(kp, ymax=fc.ymax, ymin=fc.ymin, r1=points.top, cex = 0.5)
+kpAddLabels(kp, labels = "log2 fold change", cex = 0.8, srt=90, pos=1, label.margin = 0.045, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+gene.mean <- start(top.genes) + (end(top.genes) - start(top.genes))/2
+#kpSegments(kp, chr=as.character(seqnames(top.genes)), x0=gene.mean, x1=gene.mean, y0=top.genes$log2FoldChange, y1=fc.ymax, ymax=fc.ymax, ymin=fc.ymin, r1=points.top)
+#kpPlotMarkers(kp, top.genes, labels = names(top.genes), text.orientation = "horizontal", r0=points.top)
+
+#Data panel 2
+kp2 <- kpPlotDensity(kp, data=dm.genes, window.size = 10e4, data.panel = 2)
+#kpAddLabels(kp2, labels = "gene density", cex = 0.8, srt=90, pos=1, label.margin = 0.04)
+```
+
+
+.
